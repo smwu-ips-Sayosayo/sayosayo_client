@@ -5,6 +5,7 @@ import 'package:sayosayo_client/screens/detecting.dart';
 import 'package:sayosayo_client/screens/onboarding.dart';
 
 void main() async{
+  WidgetsFlutterBinding.ensureInitialized();
   bool? isNewUser = await checkUser();
   runApp(SayoSayo(isNewUser));
 }
