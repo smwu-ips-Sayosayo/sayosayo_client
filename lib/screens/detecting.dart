@@ -1,15 +1,28 @@
+import 'dart:typed_data';
+import 'package:http/http.dart' as http;
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'dart:async';
 
+import 'package:sayosayo_client/api/SayoSayoApi.dart';
 
 class Detecting extends StatefulWidget {
-  const Detecting({super.key});
+  const Detecting({
+    Key? key,
+    required this.camera,
+  }) : super(key: key);
+
+  final CameraDescription camera;
 
   @override
   State<Detecting> createState() => _DetectingState();
 }
 
 class _DetectingState extends State<Detecting> {
+  late CameraController _controller;
+  late Future<void> _initializeControllerFuture;
   FlutterTts flutterTts = FlutterTts();
   String language = "ko-KR";
   Map<String, String> voice = {"name": "ko-kr-x-ism-local", "locale": "ko-KR"};
@@ -17,24 +30,33 @@ class _DetectingState extends State<Detecting> {
   double volume = 0.8;
   double pitch = 1.0;
   double rate = 0.5;
-  String introduction = 
-      """
-안녕하세요.
-앱 사요사요입니다.
-사용법을 간단히 알려드리겠습니다.
-편의점 내부를 비추시는 경우
-하단 버튼을 누르시면 화면 내부를 구성하는 물건 범주와 위치에 대해 안내 받으실 수 있습니다.
-물건에 대한 상세 설명을 원하시는 경우
-물건을 집은 손을 비추고 버튼을 누르시면 됩니다.
-설명을 다시 듣고 싶으신 경우 
-언제든지 버튼을 길게 눌러주세요.
-자 이제 시작을 위해 하단 버튼을 눌러주세요
-""";
+  String serverResponse = '';
+  Timer? _timer;
+
   @override
   void initState() {
     super.initState();
-    // TTS 초기 설정
     initTts();
+    _controller = CameraController(
+      widget.camera,
+      ResolutionPreset.max,
+      enableAudio: false,
+    );
+    _initializeControllerFuture = _controller.initialize().then((_) {
+      if (!mounted) {
+        return;
+      }
+      _controller.startImageStream((CameraImage image) {
+        sendImageToServer(image);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
   }
 
   initTts() async {
@@ -48,9 +70,9 @@ class _DetectingState extends State<Detecting> {
   }
 
   Future<void> initTtsIosOnly() async {
-  // iOS 전용 옵션 : 공유 오디오 인스턴스 설정
+    // iOS 전용 옵션 : 공유 오디오 인스턴스 설정
     await flutterTts.setSharedInstance(true);
- 
+
     // 배경 음악와 인앱 오디오 세션을 동시에 사용
     await flutterTts.setIosAudioCategory(
       IosTextToSpeechAudioCategory.ambient,
@@ -59,45 +81,90 @@ class _DetectingState extends State<Detecting> {
         IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
         IosTextToSpeechAudioCategoryOptions.mixWithOthers
       ],
-      IosTextToSpeechAudioMode.voicePrompt);
+      IosTextToSpeechAudioMode.voicePrompt,
+    );
   }
 
   Future _speak(voiceText) async {
     flutterTts.speak(voiceText);
   }
-  
+
+  Future<void> sendImageToServer(CameraImage image) async {
+    final bytes = concatenatePlanes(image.planes);
+    try {
+      final response = await http.post(
+        Uri.parse('${API.hostConnect}'),
+        headers: {
+          'Content-Type': 'application/octet-stream',
+        },
+        body: bytes,
+      );
+      setState(() {
+        serverResponse = response.body;
+      });
+    } catch (e) {
+      print("Error sending image to server: $e");
+    }
+  }
+
+  Uint8List concatenatePlanes(List<Plane> planes) {
+    final WriteBuffer allBytes = WriteBuffer();
+    for (Plane plane in planes) {
+      allBytes.putUint8List(plane.bytes);
+    }
+    return allBytes.done().buffer.asUint8List();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: 
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal:20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                
-              ],
+      body: Column(
+        children: [
+          Expanded(
+            child: FutureBuilder<void>(
+              future: _initializeControllerFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.done) {
+                  // 미리보기
+                  return CameraPreview(_controller);
+                } else {
+                  return const Center(child: CircularProgressIndicator());
+                }
+              },
             ),
           ),
-
+          Center(
+            child: Text(
+              serverResponse,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
       bottomNavigationBar: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: () {
-          Navigator.pushNamedAndRemoveUntil(context, '/detecting', (route) => false);
+          _speak(serverResponse);
         },
-        onLongPress: () async{
-          await _speak(introduction);
+        onLongPress: () async {
+          Navigator.pushNamedAndRemoveUntil(
+              context, '/onboarding', (route) => false);
         },
         child: Container(
           color: Colors.amber,
           width: double.maxFinite,
           height: 150,
-          child: Center(child: Text('시작하기', style: TextStyle(
-            fontSize: 60,
-            fontWeight: FontWeight.bold
-          ),))),
+          child: Center(
+            child: Text(
+              '음성',
+              style: TextStyle(fontSize: 60, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
       ),
     );
   }
