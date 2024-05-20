@@ -93,7 +93,7 @@ class _DetectingState extends State<Detecting> {
     final bytes = concatenatePlanes(image.planes);
     try {
       final response = await http.post(
-        Uri.parse('${API.hostConnect}'),
+        Uri.parse('${API.hostConnect}/stream'),
         headers: {
           'Content-Type': 'application/octet-stream',
         },
