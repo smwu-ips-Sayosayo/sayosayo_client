@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:camera/camera.dart';
 import 'package:sayosayo_client/data/Onboarding_check.dart';
 import 'package:sayosayo_client/screens/detecting.dart';
 import 'package:sayosayo_client/screens/onboarding.dart';
 
-void main() async{
+
+Future<void> main() async{
   WidgetsFlutterBinding.ensureInitialized();
+
+  final cameras = await availableCameras();
+  final firstCamera = cameras.first;
+
   bool? isNewUser = await checkUser();
-  runApp(SayoSayo(isNewUser));
+  runApp(SayoSayo(isNewUser,firstCamera));
 }
 Future<bool> checkUser() async {
   bool? isnewhere = await OnboardingCheck.getUserType();
@@ -19,7 +25,8 @@ Future<bool> checkUser() async {
 
 class SayoSayo extends StatelessWidget {
   bool isNewUser;
-  SayoSayo(this.isNewUser,{super.key});
+  dynamic firstCamera;
+  SayoSayo(this.isNewUser,this.firstCamera ,{super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -33,10 +40,10 @@ class SayoSayo extends StatelessWidget {
       ),
       home: isNewUser
             ? Onboarding()
-            : Detecting(),
+            : Detecting(camera: firstCamera!),
       routes: {
         '/onboarding':(context) => Onboarding(),
-        '/detecting':(context) => Detecting(),
+        '/detecting':(context) => Detecting(camera: firstCamera!),
       },
       debugShowCheckedModeBanner: false,
     );
