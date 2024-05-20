@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:sayosayo_client/data/Onboarding_check.dart';
 import 'package:sayosayo_client/screens/detecting.dart';
 
 class Onboarding extends StatefulWidget {
@@ -50,6 +51,7 @@ class _OnboardingState extends State<Onboarding> {
     super.initState();
     // TTS 초기 설정
     initTts();
+    OnboardingCheck.setUserType(false);
   }
 
   initTts() async {
@@ -104,6 +106,7 @@ class _OnboardingState extends State<Onboarding> {
       bottomNavigationBar: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: () {
+          flutterTts.stop();
           Navigator.pushNamedAndRemoveUntil(context, '/detecting', (route) => false);
         },
         onLongPress: () async{
