@@ -31,7 +31,9 @@ class _DetectingState extends State<Detecting> {
   double pitch = 1.0;
   double rate = 0.5;
   String serverResponse = '';
-  Timer? _timer;
+
+  Timer? _frameTimer;
+  int frameInterval = 1000; // 1000 milliseconds = 1 second
 
   @override
   void initState() {
@@ -47,14 +49,18 @@ class _DetectingState extends State<Detecting> {
         return;
       }
       _controller.startImageStream((CameraImage image) {
-        sendImageToServer(image);
+        if (_frameTimer == null || !_frameTimer!.isActive) {
+          _frameTimer = Timer(Duration(milliseconds: frameInterval), () {
+            sendImageToServer(image);
+          });
+        }
       });
     });
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _frameTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -90,29 +96,41 @@ class _DetectingState extends State<Detecting> {
   }
 
   Future<void> sendImageToServer(CameraImage image) async {
-    final bytes = concatenatePlanes(image.planes);
-    try {
-      final response = await http.post(
-        Uri.parse('${API.hostConnect}/stream'),
-        headers: {
-          'Content-Type': 'application/octet-stream',
-        },
-        body: bytes,
-      );
+  final bytes = concatenatePlanes(image.planes);
+  print("Bytes length: ${bytes.length}"); // 추가된 로그
+
+  try {
+    final response = await http.post(
+      Uri.parse('${API.hostConnect}/test'),
+      headers: {
+        'Content-Type': 'application/octet-stream',
+      },
+      body: bytes,
+    );
+
+    if (response.statusCode == 200) {
       setState(() {
         serverResponse = response.body;
       });
-    } catch (e) {
-      print("Error sending image to server: $e");
+      print("Response from server: ${response.body}");
+    } else {
+      print("Failed to send image to server: ${response.statusCode}");
+      print("Response body: ${response.body}");
     }
+  } catch (e) {
+    print("Error sending image to server: $e");
   }
+}
+
 
   Uint8List concatenatePlanes(List<Plane> planes) {
     final WriteBuffer allBytes = WriteBuffer();
     for (Plane plane in planes) {
       allBytes.putUint8List(plane.bytes);
     }
-    return allBytes.done().buffer.asUint8List();
+    Uint8List result = allBytes.done().buffer.asUint8List();
+    print("Concatenated bytes length: ${result.length}"); // 추가된 로그
+    return result;
   }
 
   @override
