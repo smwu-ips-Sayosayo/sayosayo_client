@@ -93,6 +93,7 @@ class _DetectingState extends State<Detecting> {
           serverResponse = decodedResponse['message'];
           });
           print("Response from server: ${response.body}");
+          print(serverResponse);
         } else {
           print("Failed to send image to server: ${response.statusCode}");
           print("Response body: ${response.body}");
