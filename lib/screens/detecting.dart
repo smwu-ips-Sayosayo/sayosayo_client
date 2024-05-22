@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:camera/camera.dart';
@@ -95,28 +96,25 @@ class _DetectingState extends State<Detecting> {
     flutterTts.speak(voiceText);
   }
 
-  Future<void> sendImageToServer(CameraImage image) async {
+  Future<String> base64String(Uint8List data) async {
+  return base64Encode(data);
+}
+
+// 이미지를 Base64로 인코딩하여 서버로 전송하는 함수
+Future<void> sendImageToServer(CameraImage image) async {
   final bytes = concatenatePlanes(image.planes);
-  print("Bytes length: ${bytes.length}"); // 추가된 로그
+  final String base64Image = await base64String(bytes);
 
   try {
     final response = await http.post(
-      Uri.parse('${API.hostConnect}/test'),
+      Uri.parse('${API.hostConnect}/stream'),
       headers: {
-        'Content-Type': 'application/octet-stream',
+        'Content-Type': 'application/json', // 이미지를 JSON 형식으로 전송
       },
-      body: bytes,
+      body: jsonEncode({'image': base64Image}), // 이미지를 JSON으로 인코딩하여 전송
     );
 
-    if (response.statusCode == 200) {
-      setState(() {
-        serverResponse = response.body;
-      });
-      print("Response from server: ${response.body}");
-    } else {
-      print("Failed to send image to server: ${response.statusCode}");
-      print("Response body: ${response.body}");
-    }
+    // 이하 응답 처리 코드...
   } catch (e) {
     print("Error sending image to server: $e");
   }
